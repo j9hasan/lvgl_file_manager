@@ -1,0 +1,16 @@
+{
+    "idf.adapterTargetName": "esp32",
+    "files.associations": {
+        "stdio.h": "c",
+        "string_view": "cpp",
+        "regex": "cpp",
+        "*.tcc": "cpp",
+        "string": "cpp",
+        "initializer_list": "cpp",
+        "lodepng.h": "c",
+        "string.h": "c",
+        "png.h": "c"
+    },
+    "idf.flashType": "UART",
+    "idf.port": "/dev/ttyUSB0"
+}

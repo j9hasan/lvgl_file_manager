@@ -1,0 +1,15 @@
+dependencies:
+  espressif/zlib:
+    component_hash: 999ec50086ac1c82b8321d8f540dc9fd10f5622948b935558aa16b4b66e95d9d
+    source:
+      service_url: https://api.components.espressif.com/
+      type: service
+    version: 1.3.0
+  idf:
+    component_hash: null
+    source:
+      type: idf
+    version: 4.4.7
+manifest_hash: c39ee710b8d45a5167a744b7777e475a937ae9e684e12aed0c9c6fc3cfa5b62e
+target: esp32
+version: 1.0.0
