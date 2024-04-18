@@ -11,7 +11,7 @@
 #include "lvgl.h"
 #include <dirent.h>
 #include <string.h>
-#include "ui.h"
+#include "lvgl_file_manager.h"
 
 // char **listFilesAndFolders(const char *path, int *numFiles);
 
