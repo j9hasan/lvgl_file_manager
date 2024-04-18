@@ -1,6 +1,6 @@
 #include "lvgl.h"
-#include "ui.h"
-#include "sd_fat.h"
+#include "lvgl_file_manager.h"
+#include "sd_card.h"
 #include <dirent.h>
 #include <string>
 #include <algorithm> // for transform

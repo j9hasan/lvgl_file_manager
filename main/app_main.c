@@ -1,8 +1,8 @@
 
 #include "lvgl.h"
 #include "lvgl_helpers.h"
-#include "ui.h"
-#include "sd_fat.h"
+#include "lvgl_file_manager.h"
+#include "sd_card.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "freertos/task.h"
