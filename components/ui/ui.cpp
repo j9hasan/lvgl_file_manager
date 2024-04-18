@@ -13,26 +13,29 @@ const char *tag = "file manager";
 
 // function prototypes
 void file_manager_init();
-void windowCreate(string s);
+static void window_create(string s);
+static void create_operation_list();
 static void f_manager_init_event(lv_event_t *e);
-static void list_event_handler(lv_event_t *e);
+static void main_list_event_handler(lv_event_t *e);
 static void back_event_handler(lv_event_t *e);
-// static void close_event_handler(lv_event_t *e);
 static bool process_text_file(string fname);
 static bool process_png_file(string fname);
 static bool process_jpeg_file(string fname);
-static bool listDirContent(string path);
+static bool list_dir_content(string path);
 static bool isFolder(string s);
 static string get_file_extension(const string &filename);
-string processImagePath(string filePath);
-string removeLastDir(const string &folderPath);
+static string process_image_path(const string filePath);
+static string remove_last_dir(const string &folderPath);
 
 // vars
-static string folderPath = "";
+static string folderPath = "", filePath, clicked_item;
+static uint8_t list_click_last_state;
+
 static lv_obj_t *ui_dirList;
 static lv_obj_t *currentDirLabel;
 static lv_obj_t *txtBuffer;
 static lv_obj_t *canvasArea;
+static lv_obj_t *operation_list;
 
 string root_path = "/S";
 
@@ -71,7 +74,7 @@ static void f_manager_init_event(lv_event_t *e)
 void file_manager_init()
 {
 	// list directory content of root
-	listDirContent(root_path);
+	list_dir_content(root_path);
 
 	// current dir label
 	currentDirLabel = lv_label_create(lv_scr_act());
@@ -87,12 +90,11 @@ void file_manager_init()
 	lv_obj_add_event_cb(btn, back_event_handler, LV_EVENT_CLICKED, NULL);
 }
 
-static bool listDirContent(string path)
+static bool list_dir_content(string path)
 {
 	if (lv_obj_is_valid(ui_dirList))
 	{
 		lv_obj_del(ui_dirList);
-		fflush(stdout);
 	}
 
 	ESP_LOGI(tag, "creating dir list at %s", path.c_str());
@@ -108,7 +110,7 @@ static bool listDirContent(string path)
 	if (dir == NULL)
 	{
 		ESP_LOGI(tag, "Dir is NULL");
-		fflush(stdout);
+
 		return 0;
 	}
 
@@ -122,16 +124,17 @@ static bool listDirContent(string path)
 		string dirType = (entry->d_name);
 
 		// if find any '.' confirm its a file not folder
+		lv_obj_t *btn;
 		if (isFolder(dirContent))
 		{
-			lv_obj_t *btn = lv_list_add_btn(ui_dirList, LV_SYMBOL_DIRECTORY, dirContent.c_str());
-			lv_obj_add_event_cb(btn, list_event_handler, LV_EVENT_CLICKED, NULL);
+			btn = lv_list_add_btn(ui_dirList, LV_SYMBOL_DIRECTORY, dirContent.c_str());
 		}
 		else
 		{
-			lv_obj_t *btn = lv_list_add_btn(ui_dirList, LV_SYMBOL_FILE, dirContent.c_str());
-			lv_obj_add_event_cb(btn, list_event_handler, LV_EVENT_CLICKED, NULL);
+			btn = lv_list_add_btn(ui_dirList, LV_SYMBOL_FILE, dirContent.c_str());
 		}
+		lv_obj_add_event_cb(btn, main_list_event_handler, LV_EVENT_ALL, NULL);
+
 		// cant handle so any files,so limit
 		filecount++;
 		if (filecount > maxFileLimit)
@@ -144,58 +147,82 @@ static bool listDirContent(string path)
 	return 1;
 }
 
-static void list_event_handler(lv_event_t *e)
+static void main_list_event_handler(lv_event_t *e)
 {
-	string filePath;
+
 	lv_event_code_t code = lv_event_get_code(e);
 	lv_obj_t *obj = (lv_obj_t *)lv_event_get_target(e);
 
-	string clicked_item(lv_list_get_btn_text(ui_dirList, obj));
-	clicked_item = "/" + clicked_item;
-
-	if (code == LV_EVENT_CLICKED)
+	// process file, folder strings
+	if (code == (LV_EVENT_CLICKED | LV_EVENT_LONG_PRESSED))
 	{
+		clicked_item = (lv_list_get_btn_text(ui_dirList, obj));
+		clicked_item = "/" + clicked_item;
+
 		if (isFolder(clicked_item))
 			folderPath += clicked_item;
 
 		else
 			filePath = root_path + folderPath + clicked_item;
 
-		ESP_LOGI(tag, "filePath: %s\n", filePath.c_str());
+		ESP_LOGI(tag, "procesed filePath: %s, folderPath: %s", filePath.c_str(), folderPath.c_str());
+	}
 
-		string ext = get_file_extension(clicked_item);
-		if (ext == "x")
+	// remember last clicked/long pressed
+	if (code == LV_EVENT_PRESSED)
+	{
+		list_click_last_state = code;
+	}
+	if (code == LV_EVENT_LONG_PRESSED)
+	{
+		list_click_last_state = code;
+	}
+
+	// handle click and long press, long press creates operation menu
+	if (code == LV_EVENT_CLICKED)
+	{
+
+		if (list_click_last_state == LV_EVENT_PRESSED)
 		{
-			listDirContent((root_path + folderPath));
-			lv_label_set_text(currentDirLabel, (root_path + folderPath).c_str());
+			ESP_LOGI(tag, "LV_EVENT_CLICKED");
+			string ext = get_file_extension(clicked_item);
+			if (ext == "x")
+			{
+				list_dir_content((root_path + folderPath));
+				lv_label_set_text(currentDirLabel, (root_path + folderPath).c_str());
+			}
+			if (!isFolder(clicked_item))
+			{
+				if (ext == "TXT")
+				{
+					process_text_file(filePath);
+				}
+
+				else if (ext == "PNG")
+				{
+					process_png_file(filePath);
+				}
+
+				else if (ext == "JPG")
+				{
+					process_jpeg_file(filePath);
+				}
+
+				else
+				{
+					ESP_LOGE(tag, "Unsupported file: %s", ext.c_str());
+					window_create("error!");
+					lv_label_set_text(txtBuffer, "Unsupported file format");
+				}
+			}
 		}
 
-		// ESP_LOGI(tag,"Clicked: %s\n", clicked_item.c_str());
-		// ESP_LOGI(tag,"extension: %s\n", ext.c_str());
-		if (ext == "TXT")
-		{
-			process_text_file(filePath);
-		}
-
-		else if (ext == "PNG")
-		{
-			process_png_file(filePath);
-		}
-
-		else if (ext == "JPG")
-		{
-			process_jpeg_file(filePath);
-		}
-
-		else
-		{
-			ESP_LOGE(tag, "Unsupported file extension: %s", ext.c_str());
-		}
-		fflush(stdout);
+		else if (list_click_last_state == LV_EVENT_LONG_PRESSED)
+			create_operation_list();
 	}
 }
 
-void windowCreate(string s)
+static void window_create(string s)
 {
 	lv_obj_t *msgbox = lv_msgbox_create(lv_scr_act());
 	lv_obj_set_size(msgbox, 220, 200);
@@ -233,7 +260,7 @@ void windowCreate(string s)
 
 static bool process_text_file(string fname)
 {
-	windowCreate("text viewer");
+	window_create("text viewer");
 
 	FILE *file;
 	string fullText;
@@ -265,11 +292,11 @@ static bool process_png_file(string fname)
 
 	ESP_LOGI(tag, "%s", fname.c_str());
 
-	windowCreate("png decoder");
+	window_create("png decoder");
 
 	lv_obj_t *img = lv_image_create(canvasArea);
 
-	string path = processImagePath(fname);
+	string path = process_image_path(fname);
 
 	lv_image_set_src(img, path.c_str());
 
@@ -292,8 +319,8 @@ static void back_event_handler(lv_event_t *e)
 
 	if (code == LV_EVENT_CLICKED)
 	{
-		folderPath = removeLastDir(folderPath);
-		listDirContent(root_path + folderPath);
+		folderPath = remove_last_dir(folderPath);
+		list_dir_content(root_path + folderPath);
 		lv_label_set_text(currentDirLabel, (root_path + folderPath).c_str());
 	}
 }
@@ -321,7 +348,7 @@ static string get_file_extension(const string &filename)
 }
 
 // Function to remove the last directory from the folder path
-string removeLastDir(const string &folderPath)
+static string remove_last_dir(const string &folderPath)
 {
 	// Find the position of the last '/' character
 	size_t pos = folderPath.find_last_of('/');
@@ -336,7 +363,7 @@ string removeLastDir(const string &folderPath)
 	return folderPath.substr(0, pos);
 }
 
-string processImagePath(string filePath)
+static string process_image_path(string filePath)
 {
 	// Remove the first '/'
 	filePath.erase(0, 1);
@@ -364,6 +391,87 @@ string processImagePath(string filePath)
 	}
 	ESP_LOGI(tag, "%s", filePath.c_str());
 	return filePath;
+}
+
+static void operation_list_event_handler(lv_event_t *e)
+{
+	lv_event_code_t code = lv_event_get_code(e);
+	lv_obj_t *obj = (lv_obj_t *)lv_event_get_target(e);
+	if (code == LV_EVENT_CLICKED)
+	{
+		LV_UNUSED(obj);
+
+		string clicked_item(lv_list_get_btn_text(ui_dirList, obj));
+
+		if (clicked_item == "Close" && lv_obj_is_valid(operation_list))
+		{
+			lv_obj_del(operation_list);
+		}
+
+		else if (clicked_item == "Apply" && lv_obj_is_valid(operation_list))
+		{
+			lv_obj_del(operation_list);
+		}
+
+		else if (clicked_item == "Delete" && lv_obj_is_valid(operation_list))
+		{
+			if (remove(filePath.c_str()) == 0)
+				list_dir_content(root_path + folderPath);
+			else
+				ESP_LOGW(tag, "failed to delete");
+			lv_obj_del(operation_list);
+		}
+
+		else if (clicked_item == "Open" && lv_obj_is_valid(operation_list))
+		{
+			if (isFolder(clicked_item))
+			{
+				lv_obj_del(operation_list);
+				list_dir_content(root_path + folderPath);
+			}
+
+			// else
+			// 	filePath = root_path + folderPath + clicked_item;
+			// lv_event_send(list)
+		}
+	}
+}
+static void create_operation_list()
+{
+	/*Create a list*/
+	operation_list = lv_list_create(lv_screen_active());
+	lv_obj_set_size(operation_list, lv_pct(50), lv_pct(60));
+	lv_obj_align(operation_list, LV_ALIGN_TOP_RIGHT, -10, 10);
+
+	/*Add buttons to the list*/
+	lv_obj_t *btn;
+	// lv_list_add_text(operation_list, "File");
+	// btn = lv_list_add_button(operation_list, LV_SYMBOL_FILE, "New");
+	// lv_obj_add_event_cb(btn, operation_list_event_handler, LV_EVENT_CLICKED, NULL);
+	btn = lv_list_add_button(operation_list, LV_SYMBOL_DIRECTORY, "Open");
+	lv_obj_add_event_cb(btn, operation_list_event_handler, LV_EVENT_CLICKED, NULL);
+	btn = lv_list_add_button(operation_list, LV_SYMBOL_SAVE, "Save");
+	lv_obj_add_event_cb(btn, operation_list_event_handler, LV_EVENT_CLICKED, NULL);
+	btn = lv_list_add_button(operation_list, LV_SYMBOL_CLOSE, "Delete");
+	lv_obj_add_event_cb(btn, operation_list_event_handler, LV_EVENT_CLICKED, NULL);
+	btn = lv_list_add_button(operation_list, LV_SYMBOL_EDIT, "Edit");
+	lv_obj_add_event_cb(btn, operation_list_event_handler, LV_EVENT_CLICKED, NULL);
+
+	// lv_list_add_text(operation_list, "Connectivity");
+	// btn = lv_list_add_button(operation_list, LV_SYMBOL_BLUETOOTH, "Bluetooth");
+	// lv_obj_add_event_cb(btn, operation_list_event_handler, LV_EVENT_CLICKED, NULL);
+	// btn = lv_list_add_button(operation_list, LV_SYMBOL_GPS, "Navigation");
+	// lv_obj_add_event_cb(btn, operation_list_event_handler, LV_EVENT_CLICKED, NULL);
+	// btn = lv_list_add_button(operation_list, LV_SYMBOL_USB, "USB");
+	// lv_obj_add_event_cb(btn, operation_list_event_handler, LV_EVENT_CLICKED, NULL);
+	// btn = lv_list_add_button(operation_list, LV_SYMBOL_BATTERY_FULL, "Battery");
+	// lv_obj_add_event_cb(btn, operation_list_event_handler, LV_EVENT_CLICKED, NULL);
+
+	lv_list_add_text(operation_list, "Exit");
+	btn = lv_list_add_button(operation_list, LV_SYMBOL_OK, "Apply");
+	lv_obj_add_event_cb(btn, operation_list_event_handler, LV_EVENT_CLICKED, NULL);
+	btn = lv_list_add_button(operation_list, LV_SYMBOL_CLOSE, "Close");
+	lv_obj_add_event_cb(btn, operation_list_event_handler, LV_EVENT_CLICKED, NULL);
 }
 
 // static void close_event_handler(lv_event_t *e)
