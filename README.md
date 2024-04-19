@@ -1,9 +1,29 @@
 # lvgl file manager
-# features
-# to-do
-# images
-# important
-i am using esp32 wroom, display 320*240 ili9341, touch driver xpt2046, tft and touch ----> hspi port(shared), sd card -----> vspi port,
-# how to use
+A lightweight, simple file explorer with lvgl gui, targeted for embedded systems.
+# How to use
+If you are using ESP-IDF framework, just clone the repo, adjust spi connection according to your board then build and flash.
+If you are using another framework just copy the lvgl_file_manager from components directory to ypur project, call ui_init from main function.
+# Important
+TFT and Touch shares same SPI, pins are specified in menuconfig, SD SPI pins are specified in sd_card component. On lv_conf.h, attach a file system with drive letter 'S', also enable libpng or lodepng decoder for png image support. This priject uses libpng.
+- display 320*240 ili9341
+    - HSPI port
+    - CS 15
+- touch driver xpt2046
+  - HSPI port
+  - CS 33
+  - IRQ 36
+- sd card
+  - VSPI port
+  - CS 5
+# Current features
+- browse files
+- text viewer
+- png decoder
+- create/delete files
+# To-do
+- all image format support
+- video decoder
+- more basic file handeling
 
-for more info, email jubaid.eee07@gmail.com
+In case you face any problem, raise an Issue.
+
