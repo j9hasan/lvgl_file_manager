@@ -25,7 +25,7 @@ TFT and Touch shares same SPI, pins are specified in menuconfig, SD SPI pins are
 # To-do
 - all image format support
 - video decoder
-- more basic file handeling e.g move,copy, rename
+- more basic file handeling.
 # Screenshoots
 ![app icon](images/f1.jpg)
 ![app icon](images/f2.jpg)
